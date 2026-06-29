@@ -43,10 +43,7 @@ export default async function DashboardPage() {
       <header className="border-b border-zinc-900 bg-zinc-950/50 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center text-zinc-950 font-bold">
-              N
-            </div>
-            <span className="font-bold tracking-tight text-white text-lg">Notes</span>
+            <span className="font-bold tracking-tight text-white text-lg">aass notes</span>
           </div>
 
           <div className="flex items-center gap-4">

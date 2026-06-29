@@ -98,7 +98,7 @@ authRouter.post('/logout', (c) => {
   deleteCookie(c, 'auth_token', {
     path: '/',
   });
-  return c.json({ success: true });
+  return c.redirect('/register');
 });
 
 authRouter.get('/me', authMiddleware, (c) => {

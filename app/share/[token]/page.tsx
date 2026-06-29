@@ -149,7 +149,7 @@ export default function ShareLandingPage() {
             {errorMessage}
           </p>
           <div className="mt-6 pt-4 border-t border-zinc-900 flex justify-center gap-1.5 text-xs text-zinc-500">
-            <span>Secure note delivery by Notes</span>
+            <span>Secure note delivery by aass notes</span>
           </div>
         </div>
       </div>

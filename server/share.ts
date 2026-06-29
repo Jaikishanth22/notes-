@@ -24,7 +24,8 @@ shareRouter.get('/:token', async (c) => {
 
     const isExpired = link.expiresAt ? new Date() > link.expiresAt : false;
     const isOneTimeUsed = link.shareType === 'ONE_TIME' && (link.isRevoked || link.viewCount >= 1);
-    const isValid = !link.isRevoked && !isExpired && !isOneTimeUsed;
+    const isLocked = link.lockedUntil ? new Date() < link.lockedUntil : false;
+    const isValid = !link.isRevoked && !isExpired && !isOneTimeUsed && !isLocked;
 
     return c.json({
       accessType: link.accessType,
@@ -33,6 +34,8 @@ shareRouter.get('/:token', async (c) => {
       isRevoked: link.isRevoked,
       viewCount: link.viewCount,
       isValid,
+      lockedUntil: link.lockedUntil,
+      failedAttempts: link.failedAttempts,
     });
   } catch (error) {
     console.error('Fetch share metadata error:', error);
@@ -74,6 +77,15 @@ shareRouter.post('/:token/unlock', async (c) => {
       const link = links[0];
 
       // Validation Sequence (strict order per spec):
+      // 0. Is locked out?
+      if (link.lockedUntil && new Date() < link.lockedUntil) {
+        const minutesLeft = Math.ceil((link.lockedUntil.getTime() - Date.now()) / 60000);
+        return {
+          error: `This link is temporarily locked due to too many failed password attempts. Try again in ${minutesLeft} minute(s).`,
+          status: 429,
+        };
+      }
+
       // 1. Is Revoked?
       if (link.isRevoked) {
         return { error: 'This link has been revoked.', status: 410 };
@@ -96,7 +108,29 @@ shareRouter.post('/:token/unlock', async (c) => {
         }
         const isPasswordValid = await bcrypt.compare(password, link.passwordHash || '');
         if (!isPasswordValid) {
-          return { error: 'Invalid password', status: 401 };
+          const newFailedAttempts = link.failedAttempts + 1;
+          const lockedUntilVal = newFailedAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
+
+          await tx
+            .update(shareLinks)
+            .set({
+              failedAttempts: newFailedAttempts,
+              lockedUntil: lockedUntilVal,
+            })
+            .where(eq(shareLinks.token, token));
+
+          if (lockedUntilVal) {
+            return {
+              error: 'This link has been locked for 15 minutes due to too many failed password attempts.',
+              status: 401,
+            };
+          } else {
+            const attemptsRemaining = 5 - newFailedAttempts;
+            return {
+              error: `Invalid password. ${attemptsRemaining} attempt(s) remaining before lockout.`,
+              status: 401,
+            };
+          }
         }
       }
 
@@ -110,6 +144,8 @@ shareRouter.post('/:token/unlock', async (c) => {
           viewCount: sql`${shareLinks.viewCount} + 1`,
           version: sql`${shareLinks.version} + 1`,
           isRevoked: updatedIsRevoked,
+          failedAttempts: 0,
+          lockedUntil: null,
         })
         .where(and(
           eq(shareLinks.token, token),
@@ -137,7 +173,7 @@ shareRouter.post('/:token/unlock', async (c) => {
     if ('error' in unlockResult) {
       return c.json(
         { error: unlockResult.error, requiresPassword: 'requiresPassword' in unlockResult ? unlockResult.requiresPassword : undefined },
-        unlockResult.status as 401 | 404 | 410
+        unlockResult.status as any
       );
     }
 

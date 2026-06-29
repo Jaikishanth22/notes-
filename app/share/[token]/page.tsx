@@ -11,6 +11,8 @@ interface LinkMetadata {
   isRevoked: boolean;
   viewCount: number;
   isValid: boolean;
+  lockedUntil: string | null;
+  failedAttempts: number;
 }
 
 interface NoteData {
@@ -105,18 +107,49 @@ export default function ShareLandingPage() {
     );
   }
 
-  // Handle case where metadata failed or token is completely invalid (revoked / expired / one-time-used)
+  // Compute descriptive error details
+  let errorTitle = 'Link Expired or Revoked';
+  let errorMessage = error || 'This link has expired, been revoked, or the one-time access has already been consumed.';
+
+  if (meta && !meta.isValid) {
+    const isExpired = meta.expiresAt ? new Date() > new Date(meta.expiresAt) : false;
+    const isOneTimeUsed = meta.shareType === 'ONE_TIME' && (meta.isRevoked || meta.viewCount >= 1);
+    const isLocked = meta.lockedUntil ? new Date() < new Date(meta.lockedUntil) : false;
+
+    if (isLocked) {
+      errorTitle = 'Link Temporarily Locked';
+      const minutesLeft = meta.lockedUntil ? Math.ceil((new Date(meta.lockedUntil).getTime() - Date.now()) / 60000) : 15;
+      errorMessage = `This share link is temporarily locked due to too many failed password attempts. Please try again in ${minutesLeft} minute(s).`;
+    } else if (isOneTimeUsed) {
+      errorTitle = 'Link Already Used';
+      errorMessage = 'This one-time share link has already been used and is now permanently destroyed.';
+    } else if (meta.isRevoked) {
+      errorTitle = 'Link Revoked';
+      errorMessage = 'This share link has been revoked by the owner.';
+    } else if (isExpired) {
+      errorTitle = 'Link Expired';
+      errorMessage = 'This share link has expired and is no longer available.';
+    } else {
+      errorTitle = 'Link Invalid';
+      errorMessage = 'This share link is invalid or no longer available.';
+    }
+  } else if (error === 'Share link not found') {
+    errorTitle = 'Link Not Found';
+    errorMessage = 'This share link does not exist or is invalid.';
+  }
+
+  // Handle case where metadata failed or token is completely invalid (revoked / expired / one-time-used / locked)
   if (error || (meta && !meta.isValid)) {
     return (
       <div className="flex-1 bg-zinc-950 flex flex-col justify-center items-center min-h-screen p-4">
         <div className="glass max-w-md w-full rounded-2xl border border-red-900/30 bg-red-950/5 p-6 text-center">
           <ShieldAlert className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white">Link Expired or Revoked</h2>
+          <h2 className="text-xl font-bold text-white">{errorTitle}</h2>
           <p className="text-zinc-400 text-sm mt-3">
-            {error || 'This link has expired, been revoked, or the one-time access has already been consumed.'}
+            {errorMessage}
           </p>
           <div className="mt-6 pt-4 border-t border-zinc-900 flex justify-center gap-1.5 text-xs text-zinc-500">
-            <span>Secure note delivery by VaultShare</span>
+            <span>Secure note delivery by Notes</span>
           </div>
         </div>
       </div>

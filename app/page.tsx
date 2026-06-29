@@ -44,9 +44,9 @@ export default async function DashboardPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center text-zinc-950 font-bold">
-              V
+              N
             </div>
-            <span className="font-bold tracking-tight text-white text-lg">VaultShare</span>
+            <span className="font-bold tracking-tight text-white text-lg">Notes</span>
           </div>
 
           <div className="flex items-center gap-4">

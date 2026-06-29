@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VaultShare - Secure Expiring Notes",
+  title: "Notes - Secure Expiring Notes",
   description: "Create and share password-protected, self-destructing notes with end-to-end race-condition protection.",
 };
 

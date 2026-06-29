@@ -12,6 +12,7 @@ export default function NewNotePage() {
   const [shareType, setShareType] = useState<'ONE_TIME' | 'TIME_BASED'>('ONE_TIME');
   const [accessType, setAccessType] = useState<'PUBLIC' | 'PASSWORD'>('PUBLIC');
   const [expiresAt, setExpiresAt] = useState('');
+  const [customPassword, setCustomPassword] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -232,6 +233,13 @@ export default function NewNotePage() {
       expiryVal = new Date(expiresAt).toISOString();
     }
 
+    // Password validation
+    if (accessType === 'PASSWORD' && !customPassword.trim()) {
+      setError('Please set a decryption password for Password Lock access.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/notes', {
         method: 'POST',
@@ -242,6 +250,7 @@ export default function NewNotePage() {
           shareType,
           accessType,
           expiresAt: expiryVal,
+          password: customPassword || undefined,
         }),
       });
 
@@ -387,6 +396,24 @@ export default function NewNotePage() {
                 </div>
               </div>
             </div>
+
+            {/* Custom Password Input */}
+            {accessType === 'PASSWORD' && (
+              <div className="space-y-2">
+                <label htmlFor="customPassword" className="block text-sm font-semibold text-zinc-300">
+                  Decryption Password
+                </label>
+                <input
+                  type="text"
+                  id="customPassword"
+                  required
+                  value={customPassword}
+                  onChange={(e) => setCustomPassword(e.target.value)}
+                  className="mt-2 block w-full rounded-xl border-0 py-3 px-4 text-white bg-zinc-900/60 ring-1 ring-inset ring-zinc-800 placeholder:text-zinc-650 focus:ring-2 focus:ring-inset focus:ring-zinc-600 sm:text-sm focus:outline-none transition-all"
+                  placeholder="Enter decryption password"
+                />
+              </div>
+            )}
 
             {/* Expiry Datetime Picker (Only if TIME_BASED is selected) */}
             {shareType === 'TIME_BASED' && (

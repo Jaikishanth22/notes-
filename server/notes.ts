@@ -16,6 +16,15 @@ const createNoteSchema = z.object({
   shareType: z.enum(['ONE_TIME', 'TIME_BASED']),
   accessType: z.enum(['PUBLIC', 'PASSWORD']),
   expiresAt: z.string().optional().nullable(),
+  password: z.string().optional().nullable(),
+}).refine((data) => {
+  if (data.accessType === 'PASSWORD') {
+    return !!data.password && data.password.trim() !== '';
+  }
+  return true;
+}, {
+  message: 'Password is required when access type is PASSWORD',
+  path: ['password'],
 });
 
 notesRouter.post('/', async (c) => {
@@ -24,16 +33,17 @@ notesRouter.post('/', async (c) => {
     const body = await c.req.json();
     const result = createNoteSchema.safeParse(body);
     if (!result.success) {
-      return c.json({ error: 'Invalid input parameters' }, 400);
+      const errorMsg = result.error.issues[0]?.message || 'Invalid input parameters';
+      return c.json({ error: errorMsg }, 400);
     }
 
-    const { title, content, shareType, accessType, expiresAt } = result.data;
+    const { title, content, shareType, accessType, expiresAt, password } = result.data;
 
     let plaintextKey: string | null = null;
     let passwordHash: string | null = null;
 
     if (accessType === 'PASSWORD') {
-      plaintextKey = crypto.randomBytes(4).toString('hex'); // 8 characters hex
+      plaintextKey = password!;
       passwordHash = await bcrypt.hash(plaintextKey, 10);
     }
 

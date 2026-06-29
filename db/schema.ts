@@ -25,4 +25,6 @@ export const shareLinks = pgTable('share_links', {
   isRevoked: boolean('is_revoked').default(false).notNull(),
   viewCount: integer('view_count').default(0).notNull(),
   version: integer('version').default(0).notNull(),
+  failedAttempts: integer('failed_attempts').default(0).notNull(),
+  lockedUntil: timestamp('locked_until'),
 });

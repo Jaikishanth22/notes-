@@ -283,6 +283,56 @@ Perform an atomic SQL increment (`view_count = view_count + 1`) inside the datab
 
 ---
 
+**SCREENSHOTS**
+LOGIN
+
+<img width="1012" height="678" alt="image" src="https://github.com/user-attachments/assets/c68188a0-f73a-40dc-9135-00d7823953c7" />
+
+SIGN UP
+
+<img width="702" height="593" alt="image" src="https://github.com/user-attachments/assets/abdc6058-bbd6-45a1-9fbc-da7505b9eae5" />
+
+CREATE NOTES
+
+<img width="728" height="752" alt="image" src="https://github.com/user-attachments/assets/11d507cc-629a-4bd2-991f-3578c5d004e3" />
+
+LINK AND PASWWORD 
+
+<img width="473" height="437" alt="image" src="https://github.com/user-attachments/assets/74d9d83b-1c74-401f-b788-e935adec1a42" />
+
+NOTES VIEW 
+
+<img width="767" height="342" alt="image" src="https://github.com/user-attachments/assets/dbd386db-b643-4da7-afc1-c77d7a522ab6" />
+
+
+**DEMO VEDIO**
+
+
+https://drive.google.com/file/d/1g_pb8S1KBcbJi9P69ecZSsK8syYW6442/view?usp=sharing
+
+
+
+
+**LINK**
+
+notes-ten-rose-51.vercel.app
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Author
 
 **Jai Kishanth**

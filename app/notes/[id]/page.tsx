@@ -144,7 +144,7 @@ export default function NoteDetailPage() {
           className="inline-flex items-center gap-2 text-zinc-400 hover:text-white text-sm mb-6 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to aass notes
+          Back to Dashboard
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

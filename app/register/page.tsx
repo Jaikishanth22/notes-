@@ -47,7 +47,7 @@ export default function RegisterPage() {
     <div className="flex-1 flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-zinc-950">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h1 className="text-center text-3xl font-bold tracking-tight text-white gradient-text">
-          Create an aass notes account
+          Create a VaultShare account
         </h1>
         <p className="mt-2 text-center text-sm text-zinc-400">
           Already have an account?{' '}

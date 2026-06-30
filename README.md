@@ -1,150 +1,283 @@
-# Secure Note Sharing Application
+# aass notes
 
-A highly secure, premium Next.js application designed to share notes with temporary link access, self-destructing one-time links, password protection, and brute-force protection.
-
----
-
-## Tech Stack Used
-
-- **Framework**: [Next.js 16](https://nextjs.org/) (App Router, Turbopack)
-- **API Engine**: [Hono](https://hono.dev/) (Routed dynamically via Next.js catch-all routes)
-- **Database**: PostgreSQL (Hosted on [Neon Serverless](https://neon.tech/))
-- **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
-- **Database Driver**: `pg` (node-postgres pool)
-- **Authentication**: JWT-based session cookies with RS256 equivalent signature
-- **Cryptography**: Node.js `crypto` for high-entropy tokens and keys, and `bcryptjs` for secure password hashing and verification
-- **Styling**: Modern, premium CSS styling with dark mode aesthetics (glassmorphism, subtle gradients, and micro-interactions)
+## Project Overview
+aass notes is a secure, premium note-sharing application built using **Next.js, Hono, PostgreSQL (Neon), and Drizzle ORM**. It enables authenticated users to create notes and share them securely using configurable share links with expiry, one-time access, mandatory password protection, revocation, view tracking, and brute-force lockout.
 
 ---
 
-## Setup Instructions
+# Features
 
-### 1. Prerequisites
-- **Node.js**: v18.x or higher
-- **PostgreSQL**: A running instance (e.g. Neon, local postgres)
+- JWT Authentication
+- Secure Note Management
+- One-Time Share Links (self-destruct after one view)
+- Time-Based Share Links
+- Public & Password-Protected Links
+- Mandatory password entry for password-protected links
+- Brute-force protection (lockout after 5 failed attempts)
+- Share Revocation (instantly invalidates links)
+- View Count Tracking
+- PostgreSQL + Drizzle ORM
+- Deployed on Vercel
 
-### 2. Environment Variables
-Create a `.env` file in the root directory (or use the configured one):
-```env
-DATABASE_URL="your-postgresql-connection-string"
-JWT_SECRET="your-secure-jwt-signing-secret"
-```
+---
 
-### 3. Installation
-Install the project dependencies:
+# Tech Stack
+
+| Layer | Technology |
+|--------|------------|
+| Frontend | Next.js 16 + React + TypeScript + Tailwind CSS |
+| Backend | Hono |
+| Database | PostgreSQL (Neon serverless) |
+| ORM | Drizzle ORM |
+| Authentication | JWT + bcrypt |
+| Cryptography | `crypto` (UUID and tokens) + `bcryptjs` |
+| Deployment | Vercel |
+
+---
+
+# Setup
+
 ```bash
+git clone <repository-url>
+cd task
 npm install
 ```
 
-### 4. Database Migrations
-Generate and run migrations to build the tables:
-```bash
-# Generate the SQL migration files
-npm run db:generate
+Create `.env`
 
-# Apply migrations to the database
+```env
+DATABASE_URL=your_database_url
+JWT_SECRET=your_secret
+```
+
+Run migrations
+
+```bash
 npm run db:migrate
 ```
 
-### 5. Running the Application
-Start the Next.js development server:
+Run locally
+
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## Database Schema
+# Database Schema
 
-The database is structured into three tables defined in `db/schema.ts`:
+## users
+- `id` (uuid, PRIMARY KEY)
+- `email` (text, UNIQUE, NOT NULL)
+- `passwordHash` (text, NOT NULL)
+- `createdAt` (timestamp, DEFAULT NOW)
 
-### 1. `users` Table
-Stores registered users.
-- `id`: `uuid` (PRIMARY KEY, Default: random)
-- `email`: `text` (UNIQUE, NOT NULL)
-- `passwordHash`: `text` (NOT NULL)
-- `createdAt`: `timestamp` (NOT NULL, Default: NOW)
+## notes
+- `id` (uuid, PRIMARY KEY)
+- `userId` (uuid, FOREIGN KEY referencing users.id)
+- `title` (text, NOT NULL)
+- `content` (text, NOT NULL)
+- `createdAt` (timestamp, DEFAULT NOW)
 
-### 2. `notes` Table
-Stores note content created by authenticated users.
-- `id`: `uuid` (PRIMARY KEY, Default: random)
-- `userId`: `uuid` (FOREIGN KEY referencing `users.id`, ON DELETE cascade, NOT NULL)
-- `title`: `text` (NOT NULL)
-- `content`: `text` (NOT NULL)
-- `createdAt`: `timestamp` (NOT NULL, Default: NOW)
-
-### 3. `share_links` Table
-Stores share configuration, tokens, view metrics, and lockout states for sharing links.
-- `token`: `text` (PRIMARY KEY) - A secure high-entropy token representing the share URL
-- `noteId`: `uuid` (FOREIGN KEY referencing `notes.id`, ON DELETE cascade, NOT NULL)
-- `shareType`: `text` (Constraint: `'ONE_TIME'` or `'TIME_BASED'`, NOT NULL)
-- `accessType`: `text` (Constraint: `'PUBLIC'` or `'PASSWORD'`, NOT NULL)
-- `passwordHash`: `text` (Nullable) - Bcrypt hash of the decryption key
-- `expiresAt`: `timestamp` (Nullable) - Optional link expiry time
-- `isRevoked`: `boolean` (Default: `false`, NOT NULL) - Flag for explicit revocation
-- `viewCount`: `integer` (Default: `0`, NOT NULL) - Number of successful unlocks
-- `version`: `integer` (Default: `0`, NOT NULL) - Used for optimistic concurrency control
-- `failedAttempts`: `integer` (Default: `0`, NOT NULL) - Consecutive failed password attempts
-- `lockedUntil`: `timestamp` (Nullable) - Lockout window until which the link rejects entries
+## share_links
+- `token` (text, PRIMARY KEY) - Secure high-entropy token representing the share URL
+- `noteId` (uuid, FOREIGN KEY referencing notes.id)
+- `shareType` (text: 'ONE_TIME' | 'TIME_BASED', NOT NULL)
+- `accessType` (text: 'PUBLIC' | 'PASSWORD', NOT NULL)
+- `passwordHash` (text, Nullable) - Bcrypt hash of the decryption password
+- `expiresAt` (timestamp, Nullable) - Expiration date & time
+- `isRevoked` (boolean, DEFAULT false)
+- `viewCount` (integer, DEFAULT 0)
+- `version` (integer, DEFAULT 0) - Optimistic locking version
+- `failedAttempts` (integer, DEFAULT 0) - Tracks consecutive failed password tries
+- `lockedUntil` (timestamp, Nullable) - Lockout window until which the link rejects entries
 
 ---
 
-## Core Logic & Mechanisms
+# Share Link Flow
 
-### 1. Share Link Flow
-1. **Creation**: An authenticated user creates a note, selecting link constraints:
-   - **Share Type**: `ONE_TIME` (self-destructs after one view) or `TIME_BASED` (accessible multiple times until expired).
-   - **Access Type**: `PUBLIC` (anyone with link can access) or `PASSWORD` (requires a secure decryption key).
-2. **Password & Token Generation**: The server generates:
-   - A unique 32-character secure random sharing token (`crypto.randomBytes(16).toString('hex')`).
-   - If password lock is selected, a random 8-character plaintext key is generated (`crypto.randomBytes(4).toString('hex')`) and hashed using `bcrypt` (work factor 10) before inserting. The plaintext password is shown **only once** to the creator.
-3. **Metadata Load**: When a recipient visits `/share/[token]`, the landing page fetches metadata via `GET /api/share/:token` (determining whether it is active, expired, revoked, or password locked).
-4. **Decryption**: If the link is `PASSWORD`-protected, a password form is presented. A `POST /api/share/:token/unlock` endpoint verifies credentials, handles locks/concurrency, and returns the decrypted note content.
+## 1. Creation
 
-### 2. Expiry Logic
-- For `TIME_BASED` links, the creator specifies an expiration timestamp (`expiresAt`).
-- Before serving metadata or unlocking a note, the server compares the current system timestamp with `expiresAt`. If `new Date() > expiresAt`, the server rejects access, returning a `410 Gone` error.
+An authenticated user creates a note, selecting link constraints.
 
-### 3. Invalidate / Revoke Logic
-- **Manual Revocation**: The creator can explicitly revoke access from the note details page. A call to `/api/share/:token/revoke` updates `isRevoked` to `true` in the database, instantly blocking subsequent fetches.
-- **One-Time Consumption (Self-Destruct)**: When a `ONE_TIME` link is successfully unlocked, `isRevoked` is set to `true` and `viewCount` is incremented. This is processed inside an atomic database transaction.
+### Share Type
 
-### 4. View Count Logic
-- Every successful note unlock increments `viewCount` atomically via Drizzle's `sql`${shareLinks.viewCount} + 1`` operator. This guarantees that multiple concurrent requests increments the views accurately instead of reading and overwriting stale data.
+- ONE_TIME
+- TIME_BASED
 
-### 5. Race-Condition Handling
-To prevent multiple users from opening a one-time link concurrently and viewing the note content:
-- **Pessimistic Locking**: When `/api/share/:token/unlock` is called, a transaction is opened and reads the row using `SELECT ... FOR UPDATE`. This locks the row in PostgreSQL, forcing concurrent requests for the same token to wait.
-- **Optimistic Locking Check**: Upon update, we include `WHERE token = :token AND version = :version` and increment `version = version + 1`. If the row version has changed, the transaction fails and rolls back, preventing double-view exploits.
+### Access Type
+
+- PUBLIC
+- PASSWORD (requires entering a custom password)
 
 ---
 
-## Design Questions & Answers
+## 2. Password & Token Generation
 
-### 1. How do you prevent two users from using a one-time link at the same time?
+The server generates:
+
+- Secure 32-character sharing token:
+```ts
+crypto.randomBytes(16).toString("hex")
+```
+
+If password protection is enabled:
+- The user provides their own dynamic decryption password in the UI (which is mandatory).
+- The password is encrypted on the server using **bcrypt (cost factor 10)** before storage.
+- The password is never stored in plaintext.
+
+---
+
+## 3. Metadata Load
+
+Recipient visits:
+```
+/share/[token]
+```
+
+Frontend requests:
+```
+GET /api/share/:token
+```
+
+The API validates and returns:
+- Token existence (404 if not found)
+- Expiry status (compared against `expiresAt`)
+- Revocation status (`isRevoked` flag)
+- One-time usage status (`shareType === 'ONE_TIME'` and `viewCount >= 1`)
+- Brute-force lockout status (`lockedUntil` check)
+
+If any check fails, the frontend displays a specific descriptive error card (e.g. "Link Expired", "Link Revoked", "Link Already Used", or "Link Temporarily Locked").
+
+---
+
+## 4. Unlock
+
+Password-protected links submit:
+```
+POST /api/share/:token/unlock
+```
+
+The backend:
+1. Validates that the link is not currently locked out (via `lockedUntil` check).
+2. Verifies the password using `bcrypt.compare`.
+3. If password check fails:
+   - Increments `failedAttempts` by 1.
+   - If attempts reach 5, sets `lockedUntil` to 15 minutes in the future.
+   - Returns a `401 Unauthorized` response with the remaining attempts or lockout details.
+4. If password check succeeds (or if the link is public):
+   - Resets `failedAttempts` to 0 and `lockedUntil` to `null`.
+   - Increments `viewCount` and marks `isRevoked = true` (if `ONE_TIME`).
+   - Returns note content.
+
+---
+
+# Password / Key Generation Logic
+
+- Cryptographically secure random token generation for the sharing path.
+- Bcrypt password hashing is performed with a work factor of 10.
+- Plaintext password is never stored in the database.
+
+---
+
+# Expiry Logic
+
+Every request compares the current timestamp with `expiresAt`. Expired links immediately return a `410 Gone` error, and the UI displays a clean "Link Expired" warning.
+
+---
+
+# Invalidate / Revoke Logic
+
+- **Manual**: Note creators can revoke the share link from their dashboard. The server sets `isRevoked = true`, instantly invalidating any subsequent requests.
+- **One-time self-destruct**: For ONE_TIME shares, the link is updated to `isRevoked = true` and `viewCount = 1` immediately upon the first successful decryption, destroying access.
+
+---
+
+# View Count Logic
+
+- Successful accesses increment `viewCount`.
+- To prevent dirty writes and race conditions, the update occurs atomically inside a database transaction:
+```sql
+UPDATE share_links SET view_count = view_count + 1, version = version + 1 WHERE token = :token;
+```
+
+---
+
+# Race Condition Handling
+
+One-time links are secured inside an atomic database transaction using row-level locking (**Pessimistic Locking**: `SELECT ... FOR UPDATE`).
+Concurrent requests block and queue up at the database layer. The first client to execute increments the view count and sets `isRevoked = true`, causing subsequent queued transactions to see the updated used state and fail, preventing duplicate access.
+
+---
+
+# Required Edge Cases Handled
+
+- **Invalid share link**: Correctly returns a 404 error with a custom error card.
+- **Public share link**: Auto-unlocks and serves content instantly without password prompt.
+- **Password-protected link**: Directs the user to a secure entry prompt.
+- **Wrong password**: Returns the number of attempts remaining before lockout.
+- **Expired link**: Blocks access with a descriptive "Link Expired" card.
+- **One-time link already used**: Blocks subsequent opens with a "Link Already Used" message.
+- **Revoked link**: Blocks access with a "Link Revoked" message.
+- **Concurrent access**: Prevents race conditions via database-level pessimistic locking (`SELECT FOR UPDATE`).
+- **Accurate view counts**: View counts are updated atomically on the DB server.
+
+---
+
+# Security
+
+- JWT Authentication for session management.
+- Bcrypt password hashing.
+- High-entropy secure random sharing tokens.
+- Brute-force lockout (5 failed attempts = 15-minute lock).
+- Server-side validation of inputs.
+- Safe cookie configuration (HttpOnly, Secure in prod, Lax SameSite).
+
+---
+
+# Deployment
+
+1. Push to GitHub
+2. Create Neon database
+3. Configure `DATABASE_URL`
+4. Configure `JWT_SECRET`
+5. Deploy on Vercel (migrations run automatically on build step).
+
+---
+
+# Interview Questions
+
+### How do you prevent two users from using a one-time link simultaneously?
+
 We use a database transaction combined with **Pessimistic Locking (`SELECT FOR UPDATE`)**.
-- When User A calls `/unlock`, the transaction executes `SELECT * FROM share_links WHERE token = :token FOR UPDATE`. This locks the row in PostgreSQL.
-- If User B concurrently calls `/unlock`, their transaction will block at the query layer, waiting for User A's transaction to finish.
-- User A's transaction verifies that the link is not revoked and that `viewCount` is `0`. It then updates `viewCount` to `1`, sets `isRevoked = true` (since it is a one-time link), and commits.
-- Once User A commits, the lock is released. User B's transaction unblocks, executes, reads the updated row state, sees `viewCount = 1` and `isRevoked = true`, and is rejected with a `410 Gone` error before it can retrieve the note content.
+- When User A hits the `/unlock` endpoint, it locks the `share_links` row in PostgreSQL.
+- If User B concurrent requests `/unlock`, they will block and wait for User A's transaction to commit.
+- User A's transaction verifies `viewCount` is `0`, increments it to `1`, sets `isRevoked = true`, and commits.
+- Once User A commits, the lock is released. User B's transaction unblocks, reads the updated row, sees `viewCount = 1`, and returns a `410 Gone` error immediately.
 
-### 2. How do you update view count safely?
-The view count is updated using **Atomic Database Expressions** inside our pessimistic locking transaction. Instead of reading the view count into application memory, adding 1, and writing it back (which is prone to race conditions), we execute:
+### How do you update view count safely?
+
+Perform an atomic SQL increment inside the transaction rather than a read-modify-write in application memory:
 ```sql
 UPDATE share_links SET view_count = view_count + 1, version = version + 1 WHERE token = :token AND version = :current_version;
 ```
-This ensures the increment happens atomically on the database server. If another thread managed to update the row in the split-second between our read and write, the optimistic `version` check would fail, forcing a rollback and preventing view count inaccuracies.
+This guarantees thread-safe, concurrent updates on the database engine.
 
-### 3. How would this work if 1 million people opened the link?
-Under extreme load, executing direct database locks on every request will lead to database connection exhaustion, lock contention, and server crashes. To scale to 1 million concurrent users:
-1. **Metadata Caching**: Cache all share link metadata (e.g., expiry, revocation status, hashed password) in a distributed, high-performance in-memory cache like **Redis**. If a link is expired, revoked, or locked, the request is rejected immediately at the cache layer without touching the database.
-2. **Atomic In-Memory Consumption**: For one-time links, we can use Redis atomic commands like `INCR` or Lua scripts to evaluate and consume the link in memory (e.g., check if the token key is present, if yes delete/consume it and grant access, otherwise reject).
-3. **Queueing writes**: Successful read and increment actions can be logged to a message broker (e.g., Kafka or RabbitMQ) and batched/written back to the main PostgreSQL database asynchronously, removing db write bottlenecks from the critical path.
-4. **Connection Pooling**: Deploy a high-throughput connection pooler like **pgBouncer** to multiplex database connections.
+### How would this scale to 1 million users?
 
-### 4. How would you prevent brute-force attempts on password-protected links?
-We employ three primary defensive layers:
-1. **Account/Link Lockout (Implemented)**: The database tracks `failedAttempts` and `lockedUntil`. If a recipient enters a wrong password 5 consecutive times, `lockedUntil` is set to `now() + 15 minutes`. During this window, all unlock requests are rejected immediately without checking the bcrypt hash.
-2. **Rate Limiting**: Implement IP-based rate limiting on the `/api/share/:token/unlock` endpoint using a cache layer (e.g., max 5 attempts per token per IP in a 10-minute window).
-3. **Deliberate Backoff**: We introduce a short artificial delay (e.g. 500ms) on password verification failures. Because bcrypt is computationally heavy, and when combined with a lockout penalty and network delays, brute-forcing becomes practically impossible.
+1. **Metadata Caching**: Cache link statuses, expiration timestamps, and revocation flags in **Redis**. Expired, revoked, or locked link requests can be rejected instantly at the cache layer, keeping 99% of requests off the PostgreSQL database.
+2. **In-Memory Consumption**: Use Redis atomic operations (`DECR` or Lua scripts) to instantly consume and validate one-time links in memory.
+3. **Queueing writes**: Send view-count and usage updates to a message broker (e.g. Kafka/RabbitMQ) to update PostgreSQL asynchronously in batches.
+4. **Connection Pooling**: Deploy **pgBouncer** to multiplex database connections.
+
+### How do you prevent brute-force attacks?
+
+- **Lockout (Implemented)**: We track consecutive failures in the database. 5 failed attempts sets a 15-minute lockout timer on the link, instantly rejecting requests.
+- **Rate Limiting**: Add IP-based rate limiting on the `/api/share/:token/unlock` route (e.g. max 5 hits/minute).
+- **Backoff Delay**: Introduce a slight delay (e.g. 500ms) on password verification failures, increasing computational and network costs for attackers.
+
+---
+
+# Author
+
+**Jai Kishanth**
